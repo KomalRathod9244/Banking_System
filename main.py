@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Banking System - Terminal CLI (Phase 1 + Phase 2)."""
+"""Banking System - Terminal CLI (Phase 1 + Phase 2 + Phase 3)."""
 
 import sys
 from decimal import Decimal
@@ -9,6 +9,7 @@ from services.account_service import AccountService
 from services.bank_service import BankService
 from services.branch_service import BranchService
 from services.customer_service import CustomerService
+from services.loan_service import LoanService
 
 
 def print_header(title: str) -> None:
@@ -327,14 +328,172 @@ def handle_list_accounts_by_branch(account_service: AccountService) -> None:
         print_error(str(exc))
 
 
+def handle_apply_loan(loan_service: LoanService) -> None:
+    print_header("Apply for Loan")
+    customer_id = prompt("Customer ID")
+    branch_id = prompt("Branch ID")
+    loan_type = prompt("Loan type (PERSONAL/HOME/AUTO)", "PERSONAL")
+    principal = prompt("Principal amount")
+    tenure = prompt("Tenure in months")
+    try:
+        loan = loan_service.apply_for_loan(
+            int(customer_id),
+            int(branch_id),
+            loan_type,
+            Decimal(principal),
+            int(tenure),
+        )
+        print_success(
+            f"Loan application submitted (ID: {loan.id}).\n"
+            f"  Type: {loan.loan_type}  |  Principal: Rs.{loan.principal:.2f}\n"
+            f"  Rate: {loan.interest_rate}%  |  Tenure: {loan.tenure_months} months\n"
+            f"  EMI: Rs.{loan.emi:.2f}  |  Status: {loan.status}"
+        )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_approve_loan(loan_service: LoanService) -> None:
+    print_header("Approve Loan")
+    loan_id = prompt("Loan ID")
+    try:
+        loan = loan_service.approve_loan(int(loan_id))
+        print_success(f"Loan {loan.id} approved. Status: {loan.status}")
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_reject_loan(loan_service: LoanService) -> None:
+    print_header("Reject Loan")
+    loan_id = prompt("Loan ID")
+    try:
+        loan = loan_service.reject_loan(int(loan_id))
+        print_success(f"Loan {loan.id} rejected. Status: {loan.status}")
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_disburse_loan(loan_service: LoanService) -> None:
+    print_header("Disburse Loan")
+    loan_id = prompt("Loan ID")
+    account_number = prompt("Customer account number (for disbursement)")
+    try:
+        loan = loan_service.disburse_loan(int(loan_id), account_number)
+        print_success(
+            f"Loan {loan.id} disbursed.\n"
+            f"  Amount: Rs.{loan.principal:.2f} credited to account.\n"
+            f"  Outstanding: Rs.{loan.outstanding:.2f}  |  Status: {loan.status}"
+        )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_repay_loan(loan_service: LoanService) -> None:
+    print_header("Repay Loan")
+    loan_id = prompt("Loan ID")
+    amount = prompt("Repayment amount")
+    try:
+        loan, payment = loan_service.repay_loan(int(loan_id), Decimal(amount))
+        status_msg = "Loan fully repaid and CLOSED." if loan.status == "CLOSED" else ""
+        print_success(
+            f"Repayment of Rs.{payment.amount:.2f} recorded.\n"
+            f"  Outstanding: Rs.{loan.outstanding:.2f}  |  Status: {loan.status}\n"
+            f"  {status_msg}"
+        )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_view_loan(loan_service: LoanService) -> None:
+    print_header("View Loan Details")
+    loan_id = prompt("Loan ID")
+    try:
+        loan = loan_service.get_loan(int(loan_id))
+        print(f"\nLoan #{loan.id}")
+        print(f"  Customer ID  : {loan.customer_id}")
+        print(f"  Branch ID    : {loan.branch_id}")
+        print(f"  Type         : {loan.loan_type}")
+        print(f"  Principal    : Rs.{loan.principal:.2f}")
+        print(f"  Interest Rate: {loan.interest_rate}% p.a.")
+        print(f"  Tenure       : {loan.tenure_months} months")
+        print(f"  EMI          : Rs.{loan.emi:.2f}")
+        print(f"  Outstanding  : Rs.{loan.outstanding:.2f}")
+        print(f"  Status       : {loan.status}")
+        print(f"  Account ID   : {loan.account_id or 'Not linked'}")
+        print(f"  Applied On   : {loan.created_at}")
+        if loan.approved_at:
+            print(f"  Approved On  : {loan.approved_at}")
+        if loan.disbursed_at:
+            print(f"  Disbursed On : {loan.disbursed_at}")
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_list_customer_loans(loan_service: LoanService) -> None:
+    print_header("List Customer Loans")
+    customer_id = prompt("Customer ID")
+    try:
+        loans = loan_service.list_loans_by_customer(int(customer_id))
+        if not loans:
+            print("No loans found for this customer.")
+            return
+        print(
+            f"{'ID':<6}{'Type':<10}{'Principal':<14}{'EMI':<12}"
+            f"{'Outstanding':<14}{'Status':<10}{'Tenure'}"
+        )
+        print("-" * 80)
+        for loan in loans:
+            print(
+                f"{loan.id:<6}{loan.loan_type:<10}Rs.{loan.principal:<12.2f}"
+                f"Rs.{loan.emi:<10.2f}Rs.{loan.outstanding:<12.2f}"
+                f"{loan.status:<10}{loan.tenure_months} mo"
+            )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_loan_payment_history(loan_service: LoanService) -> None:
+    print_header("Loan Payment History")
+    loan_id = prompt("Loan ID")
+    limit = prompt("Number of records (default 20)", "20")
+    try:
+        payments = loan_service.get_payment_history(int(loan_id), int(limit))
+        if not payments:
+            print("No payments found for this loan.")
+            return
+        print(f"\nPayments for Loan #{loan_id}:")
+        print(f"{'ID':<6}{'Amount':<14}{'Outstanding':<14}{'Date'}")
+        print("-" * 50)
+        for payment in payments:
+            print(
+                f"{payment.id:<6}Rs.{payment.amount:<12.2f}"
+                f"Rs.{payment.outstanding_after:<12.2f}{payment.created_at}"
+            )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_preview_emi(loan_service: LoanService) -> None:
+    print_header("Preview EMI")
+    loan_type = prompt("Loan type (PERSONAL/HOME/AUTO)", "PERSONAL")
+    principal = prompt("Principal amount")
+    tenure = prompt("Tenure in months")
+    try:
+        emi = loan_service.preview_emi(loan_type, Decimal(principal), int(tenure))
+        print_success(f"Estimated EMI: Rs.{emi:.2f} per month")
+    except ValueError as exc:
+        print_error(str(exc))
+
+
 def main_menu() -> None:
     bank_service = BankService()
     branch_service = BranchService()
     customer_service = CustomerService()
     account_service = AccountService()
+    loan_service = LoanService()
 
     while True:
-        print_header("Banking System - Phase 2")
+        print_header("Banking System - Phase 3")
         print("  BANK")
         print("    1. Create Bank")
         print("    2. List Banks")
@@ -356,6 +515,16 @@ def main_menu() -> None:
         print("   13. List Branches by Bank")
         print("   14. List Customers by Branch")
         print("   15. List Accounts by Branch")
+        print("  LOANS")
+        print("   16. Apply for Loan")
+        print("   17. Approve Loan")
+        print("   18. Reject Loan")
+        print("   19. Disburse Loan")
+        print("   20. Repay Loan")
+        print("   21. View Loan Details")
+        print("   22. List Customer Loans")
+        print("   23. Loan Payment History")
+        print("   24. Preview EMI")
         print("  OTHER")
         print("    0. Exit")
         print("-" * 50)
@@ -392,6 +561,24 @@ def main_menu() -> None:
             handle_list_customers_by_branch(customer_service)
         elif choice == "15":
             handle_list_accounts_by_branch(account_service)
+        elif choice == "16":
+            handle_apply_loan(loan_service)
+        elif choice == "17":
+            handle_approve_loan(loan_service)
+        elif choice == "18":
+            handle_reject_loan(loan_service)
+        elif choice == "19":
+            handle_disburse_loan(loan_service)
+        elif choice == "20":
+            handle_repay_loan(loan_service)
+        elif choice == "21":
+            handle_view_loan(loan_service)
+        elif choice == "22":
+            handle_list_customer_loans(loan_service)
+        elif choice == "23":
+            handle_loan_payment_history(loan_service)
+        elif choice == "24":
+            handle_preview_emi(loan_service)
         elif choice == "0":
             print("\nThank you for using the Banking System. Goodbye!")
             sys.exit(0)
