@@ -42,16 +42,20 @@ class TransactionRepository:
             row = cur.fetchone()
             return Transaction.from_row(row) if row else None
 
-    def list_by_account(self, account_id: int) -> List[Transaction]:
+    def list_by_account(
+        self, account_id: int, limit: int | None = None
+    ) -> List[Transaction]:
         with get_cursor() as (_, cur):
-            cur.execute(
-                """
+            query = """
                 SELECT id, account_id, transaction_type, amount,
                        balance_after, description, created_at
                 FROM transactions
                 WHERE account_id = %s
                 ORDER BY created_at DESC
-                """,
-                (account_id,),
-            )
+            """
+            if limit is not None:
+                query += " LIMIT %s"
+                cur.execute(query, (account_id, limit))
+            else:
+                cur.execute(query, (account_id,))
             return [Transaction.from_row(row) for row in cur.fetchall()]

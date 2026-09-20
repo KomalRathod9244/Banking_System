@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Phase 1 Banking System - Terminal CLI."""
+
+"""Banking System - Terminal CLI (Phase 1 + Phase 2)."""
 
 import sys
 from decimal import Decimal
@@ -157,7 +158,7 @@ def handle_open_account(account_service: AccountService) -> None:
         )
         print_success(
             f"Account opened: {account.account_number} "
-            f"(Type: {account.account_type}, Balance: ${account.balance:.2f})"
+            f"(Type: {account.account_type}, Balance: Rs.{account.balance:.2f})"
         )
     except ValueError as exc:
         print_error(str(exc))
@@ -175,8 +176,8 @@ def handle_deposit(account_service: AccountService) -> None:
             description or None,
         )
         print_success(
-            f"Deposit of ${transaction.amount:.2f} completed. "
-            f"New balance: ${transaction.balance_after:.2f}"
+            f"Deposit of Rs.{transaction.amount:.2f} completed. "
+            f"New balance: Rs.{transaction.balance_after:.2f}"
         )
     except ValueError as exc:
         print_error(str(exc))
@@ -194,8 +195,8 @@ def handle_withdraw(account_service: AccountService) -> None:
             description or None,
         )
         print_success(
-            f"Withdrawal of ${transaction.amount:.2f} completed. "
-            f"New balance: ${transaction.balance_after:.2f}"
+            f"Withdrawal of Rs.{transaction.amount:.2f} completed. "
+            f"New balance: Rs.{transaction.balance_after:.2f}"
         )
     except ValueError as exc:
         print_error(str(exc))
@@ -209,8 +210,119 @@ def handle_check_balance(account_service: AccountService) -> None:
         account = account_service.get_account(account_number)
         print_success(
             f"Account {account.account_number} ({account.account_type}) "
-            f"balance: ${balance:.2f}"
+            f"balance: Rs.{balance:.2f}"
         )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_transfer(account_service: AccountService) -> None:
+    print_header("Transfer Funds")
+    from_account = prompt("From account number")
+    to_account = prompt("To account number")
+    amount = prompt("Amount")
+    description = prompt("Description (optional)", "")
+    try:
+        withdrawal_tx, deposit_tx = account_service.transfer(
+            from_account,
+            to_account,
+            Decimal(amount),
+            description or None,
+        )
+        print_success(
+            f"Transfer of Rs.{withdrawal_tx.amount:.2f} completed.\n"
+            f"  From {from_account}: new balance Rs.{withdrawal_tx.balance_after:.2f}\n"
+            f"  To   {to_account}: new balance Rs.{deposit_tx.balance_after:.2f}"
+        )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_transaction_history(account_service: AccountService) -> None:
+    print_header("Transaction History")
+    account_number = prompt("Account number")
+    limit = prompt("Number of records (default 20)", "20")
+    try:
+        transactions = account_service.get_transaction_history(
+            account_number, int(limit)
+        )
+        if not transactions:
+            print("No transactions found for this account.")
+            return
+        print(f"\nTransactions for {account_number}:")
+        print(
+            f"{'ID':<6}{'Type':<12}{'Amount':<14}{'Balance':<14}"
+            f"{'Date':<22}{'Description'}"
+        )
+        print("-" * 90)
+        for tx in transactions:
+            desc = (tx.description or "-")[:30]
+            print(
+                f"{tx.id:<6}{tx.transaction_type:<12}Rs.{tx.amount:<12.2f}"
+                f"Rs.{tx.balance_after:<12.2f}{str(tx.created_at):<22}{desc}"
+            )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_list_branches_by_bank(branch_service: BranchService) -> None:
+    print_header("List Branches by Bank")
+    bank_id = prompt("Bank ID")
+    try:
+        branches = branch_service.list_branches_by_bank(int(bank_id))
+        if not branches:
+            print("No branches found for this bank.")
+            return
+        print(f"{'ID':<6}{'Bank ID':<10}{'Name':<25}{'Phone':<16}{'Address'}")
+        print("-" * 90)
+        for branch in branches:
+            address = branch.address or "-"
+            phone = branch.phone or "-"
+            print(
+                f"{branch.id:<6}{branch.bank_id:<10}{branch.name:<25}"
+                f"{phone:<16}{address}"
+            )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_list_customers_by_branch(customer_service: CustomerService) -> None:
+    print_header("List Customers by Branch")
+    branch_id = prompt("Branch ID")
+    try:
+        customers = customer_service.list_customers_by_branch(int(branch_id))
+        if not customers:
+            print("No customers found for this branch.")
+            return
+        print(f"{'ID':<6}{'Branch':<8}{'Name':<25}{'Email':<28}{'Phone'}")
+        print("-" * 90)
+        for customer in customers:
+            print(
+                f"{customer.id:<6}{customer.branch_id:<8}{customer.full_name:<25}"
+                f"{customer.email:<28}{customer.phone}"
+            )
+    except ValueError as exc:
+        print_error(str(exc))
+
+
+def handle_list_accounts_by_branch(account_service: AccountService) -> None:
+    print_header("List Accounts by Branch")
+    branch_id = prompt("Branch ID")
+    try:
+        accounts = account_service.list_accounts_by_branch(int(branch_id))
+        if not accounts:
+            print("No accounts found for this branch.")
+            return
+        print(
+            f"{'ID':<6}{'Account No':<16}{'Customer':<10}"
+            f"{'Type':<10}{'Balance':<14}{'Status'}"
+        )
+        print("-" * 70)
+        for account in accounts:
+            print(
+                f"{account.id:<6}{account.account_number:<16}{account.customer_id:<10}"
+                f"{account.account_type:<10}Rs.{account.balance:<12.2f}{account.status}"
+            )
     except ValueError as exc:
         print_error(str(exc))
 
@@ -222,7 +334,7 @@ def main_menu() -> None:
     account_service = AccountService()
 
     while True:
-        print_header("Banking System - Phase 1")
+        print_header("Banking System - Phase 2")
         print("  BANK")
         print("    1. Create Bank")
         print("    2. List Banks")
@@ -237,6 +349,13 @@ def main_menu() -> None:
         print("    8. Deposit")
         print("    9. Withdraw")
         print("   10. Check Balance")
+        print("  TRANSFER & HISTORY")
+        print("   11. Transfer Funds")
+        print("   12. Transaction History")
+        print("  BRANCH REPORTS")
+        print("   13. List Branches by Bank")
+        print("   14. List Customers by Branch")
+        print("   15. List Accounts by Branch")
         print("  OTHER")
         print("    0. Exit")
         print("-" * 50)
@@ -263,6 +382,16 @@ def main_menu() -> None:
             handle_withdraw(account_service)
         elif choice == "10":
             handle_check_balance(account_service)
+        elif choice == "11":
+            handle_transfer(account_service)
+        elif choice == "12":
+            handle_transaction_history(account_service)
+        elif choice == "13":
+            handle_list_branches_by_bank(branch_service)
+        elif choice == "14":
+            handle_list_customers_by_branch(customer_service)
+        elif choice == "15":
+            handle_list_accounts_by_branch(account_service)
         elif choice == "0":
             print("\nThank you for using the Banking System. Goodbye!")
             sys.exit(0)

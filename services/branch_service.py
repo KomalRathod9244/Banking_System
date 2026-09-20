@@ -36,6 +36,12 @@ class BranchService:
     def list_branches(self) -> List[Branch]:
         return self.branch_repository.list_all()
 
+    def list_branches_by_bank(self, bank_id: int) -> List[Branch]:
+        bank_id = validate_positive_id(bank_id, "Bank ID")
+        if self.bank_repository.get_by_id(bank_id) is None:
+            raise ValueError(f"Bank with ID {bank_id} not found.")
+        return self.branch_repository.list_by_bank(bank_id)
+
     def get_branch(self, branch_id: int) -> Branch:
         branch_id = validate_positive_id(branch_id, "Branch ID")
         branch = self.branch_repository.get_by_id(branch_id)

@@ -47,6 +47,12 @@ class CustomerService:
     def list_customers(self) -> List[Customer]:
         return self.customer_repository.list_all()
 
+    def list_customers_by_branch(self, branch_id: int) -> List[Customer]:
+        branch_id = validate_positive_id(branch_id, "Branch ID")
+        if self.branch_repository.get_by_id(branch_id) is None:
+            raise ValueError(f"Branch with ID {branch_id} not found.")
+        return self.customer_repository.list_by_branch(branch_id)
+
     def get_customer(self, customer_id: int) -> Customer:
         customer_id = validate_positive_id(customer_id, "Customer ID")
         customer = self.customer_repository.get_by_id(customer_id)

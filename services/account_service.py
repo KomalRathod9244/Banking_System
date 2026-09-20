@@ -120,6 +120,54 @@ class AccountService:
     def list_accounts(self) -> List[Account]:
         return self.account_repository.list_all()
 
+    def list_accounts_by_branch(self, branch_id: int) -> List[Account]:
+        branch_id = validate_positive_id(branch_id, "Branch ID")
+        if self.branch_repository.get_by_id(branch_id) is None:
+            raise ValueError(f"Branch with ID {branch_id} not found.")
+        return self.account_repository.list_by_branch(branch_id)
+
+    def transfer(
+        self,
+        from_account_number: str,
+        to_account_number: str,
+        amount: Decimal,
+        description: Optional[str] = None,
+    ) -> tuple[Transaction, Transaction]:
+        from_account_number = validate_required_string(
+            from_account_number, "Source account number"
+        )
+        to_account_number = validate_required_string(
+            to_account_number, "Destination account number"
+        )
+        amount = validate_amount(amount)
+
+        if from_account_number == to_account_number:
+            raise ValueError("Cannot transfer to the same account.")
+
+        from_account = self._get_active_account(from_account_number)
+        to_account = self._get_active_account(to_account_number)
+
+        return self.account_repository.transfer(
+            from_account.id,
+            to_account.id,
+            amount,
+            description,
+        )
+
+    def get_transaction_history(
+        self,
+        account_number: str,
+        limit: int = 20,
+    ) -> List[Transaction]:
+        account_number = validate_required_string(account_number, "Account number")
+        limit = validate_positive_id(limit, "Limit")
+
+        account = self.account_repository.get_by_account_number(account_number)
+        if account is None:
+            raise ValueError(f"Account '{account_number}' not found.")
+
+        return self.transaction_repository.list_by_account(account.id, limit=limit)
+
     def _get_active_account(self, account_number: str) -> Account:
         account = self.account_repository.get_by_account_number(account_number)
         if account is None:
